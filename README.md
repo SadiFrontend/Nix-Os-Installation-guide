@@ -41,7 +41,7 @@ Let's go! 🚀
 
 ## Boot the NixOS Installer
 
-- Insert USB, boot from it (enter BIOS/UEFI if needed).
+- Insert USB, boot from it (enter BIOS/UEFI if needed). often it is F12 just spam it 
 - Choose **Install NixOS** or just use the live environment.
 - Open a terminal (it's root by default).
 
