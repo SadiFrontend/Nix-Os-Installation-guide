@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 Beautiful NixOS Setup with Flakes & Home Manager 🌟</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        .tip {
+            background-color: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🌟 Beautiful NixOS Setup with Flakes & Home Manager 🌟</h1>
+        <p>Welcome, friend! 👋</p>
+        <p>This is a <strong>friendly, beginner-oriented guide</strong> to installing <strong>NixOS</strong> using <strong>flakes</strong> from the very beginning, and setting up <strong>Home Manager</strong> for your user environment — all in one clean, declarative, reproducible setup.</p>
+        <p>This guide assumes you're starting fresh (new machine or reinstall). It's designed to be safe, step-by-step, and full of explanations. No rushing — we'll take it slow and steady. 💆‍♂️</p>
+        <p>Why this combo?</p>
+        <ul>
+            <li><strong>NixOS</strong>: Fully declarative OS — your entire system is defined in code.</li>
+            <li><strong>Flakes</strong>: Reproducible, pinned dependencies. No more "it works on my machine" surprises.</li>
+            <li><strong>Home Manager</strong>: Declarative user config (dotfiles, packages, shell, etc.) integrated directly into your NixOS setup.</li>
+        </ul>
+        <p>Let's go! 🚀</p>
+    </header>
+
+    <nav>
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#preparation">Preparation</a></li>
+            <li><a href="#boot-the-nixos-installer">Boot the NixOS Installer</a></li>
+            <li><a href="#partition--format-disks">Partition & Format Disks</a></li>
+            <li><a href="#mount-partitions">Mount Partitions</a></li>
+            <li><a href="#generate-hardware-config">Generate Hardware Config</a></li>
+            <li><a href="#set-up-your-flake-config-repo">Set Up Your Flake Config Repo</a></li>
+            <li><a href="#example-flake-structure">Example Flake Structure</a></li>
+            <li><a href="#install-nixos-with-the-flake">Install NixOS with the Flake</a></li>
+            <li><a href="#first-boot--final-steps">First Boot & Final Steps</a></li>
+            <li><a href="#applying-changes-later">Applying Changes Later</a></li>
+            <li><a href="#tips--troubleshooting">Tips & Troubleshooting</a></li>
+        </ul>
+    </nav>
+
+    <section id="preparation">
+        <h2>Preparation</h2>
+        <ol>
+            <li><strong>Download the latest NixOS ISO</strong><br>
+                Go to: <a href="https://nixos.org/download.html">https://nixos.org/download.html</a><br>
+                Choose the <strong>Graphical Live CD</strong> (Plasma or GNOME — easier for beginners).<br>
+                Verify the SHA256 checksum if you want to be extra safe.
+            </li>
+            <li><strong>Create a bootable USB</strong><br>
+                - Linux/Mac: <code>dd if=nixos-*.iso of=/dev/sdX bs=4M status=progress oflag=sync</code><br>
+                - Windows: Use Rufus or Balena Etcher.
+            </li>
+            <li><strong>Back up any important data</strong> on the target machine! ⚠️</li>
+        </ol>
+    </section>
+
+    <section id="boot-the-nixos-installer">
+        <h2>Boot the NixOS Installer</h2>
+        <ul>
+            <li>Insert USB, boot from it (enter BIOS/UEFI if needed).</li>
+            <li>Choose <strong>Install NixOS</strong> or just use the live environment.</li>
+            <li>Open a terminal (it's root by default).</li>
+        </ul>
+    </section>
+
+    <section id="partition--format-disks">
+        <h2>Partition & Format Disks</h2>
+        <p>We'll do a simple EFI + root setup. Adjust if you need swap, LUKS encryption, etc.</p>
+        <pre><code># List disks (be VERY careful — don't wipe the wrong one!)
+lsblk
+
+# Example: partition /dev/sda (replace sda with your disk!)
+cfdisk /dev/sda
+# Create:
+# - 512M EFI partition (type EF00)
+# - Rest as Linux root (type 8300)
+
+# Format
+mkfs.fat -F32 /dev/sda1          # EFI
+mkfs.ext4 -L nixos /dev/sda2      # Root (or use btrfs: mkfs.btrfs -L nixos /dev/sda2)
+
+# If you want swap, add a swap partition and: mkswap /dev/sda3 && swapon /dev/sda3</code></pre>
+        <div class="tip">
+            Tip: Want Btrfs? Use <code>mkfs.btrfs</code> and later enable snapshots — super cool for rollbacks!
+        </div>
+    </section>
+
+    <section id="mount-partitions">
+        <h2>Mount Partitions</h2>
+        <pre><code>mount /dev/sda2 /mnt
+
+mkdir -p /mnt/boot
+mount /dev/sda1 /mnt/boot</code></pre>
+    </section>
+
+    <section id="generate-hardware-config">
+        <h2>Generate Hardware Config</h2>
+        <pre><code>nixos-generate-config --root /mnt</code></pre>
+        <p>This creates:</p>
+        <ul>
+            <li><code>/mnt/etc/nixos/hardware-configuration.nix</code></li>
+            <li><code>/mnt/etc/nixos/configuration.nix</code> (basic template)</li>
+        </ul>
+    </section>
+
+    <section id="set-up-your-flake-config-repo">
+        <h2>Set Up Your Flake Config Repo</h2>
+        <p>We'll create a simple flake-based config right on the installer.</p>
+        <pre><code># Install git
+nix-shell -p git
+
+# Go to the config directory
+cd /mnt/etc/nixos
+
+# Initialize a git repo (or clone your own from GitHub later)
+git init
+
+# Create the flake structure
+mkdir -p hosts/myhost home/myuser</code></pre>
+        <p>Now create the files (use <code>nano</code> or <code>vim</code> — both are available).</p>
+    </section>
+
+    <section id="example-flake-structure">
+        <h2>Example Flake Structure</h2>
+        <h3>1. <code>flake.nix</code> (main entry point)</h3>
+        <pre><code>{
+  description = "My beautiful NixOS + Home Manager setup";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { self, nixpkgs, home-manager, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./hosts/myhost/configuration.nix
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.users.myuser = import ./home/myuser/home.nix;
+        }
+      ];
+    };
+  };
+}</code></pre>
+        <div class="tip">Replace <code>myhost</code> with your desired hostname and <code>myuser</code> with your username.</div>
+
+        <h3>2. <code>hosts/myhost/configuration.nix</code></h3>
+        <pre><code>{ config, pkgs, ... }:
+
+{
+  imports = [ ./hardware-configuration.nix ];
+
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  networking.hostName = "myhost";  # Change this!
+  networking.wireless.enable = true;  # Or use NetworkManager
+
+  time.timeZone = "Asia/Tashkent";  # Your timezone 💫
+
+  users.users.myuser = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" ];
+    initialPassword = "changeme";  # Change after first boot!
+  };
+
+  environment.systemPackages = with pkgs; [
+    wget curl git vim nano
+  ];
+
+  system.stateVersion = "24.11";  # Match your NixOS version
+}</code></pre>
+
+        <h3>3. <code>home/myuser/home.nix</code></h3>
+        <pre><code>{ config, pkgs, ... }:
+
+{
+  home.username = "myuser";
+  home.homeDirectory = "/home/myuser";
+
+  home.packages = with pkgs; [
+    firefox neovim htop
+    # Add your favorites here!
+  ];
+
+  programs.git = {
+    enable = true;
+    userName = "Your Name";
+    userEmail = "you@example.com";
+  };
+
+  programs.zsh = {
+    enable = true;
+    oh-my-zsh = {
+      enable = true;
+      theme = "robbyrussell";
+    };
+  };
+
+  home.stateVersion = "24.11";
+}</code></pre>
+
+        <h3>4. Move hardware config</h3>
+        <pre><code>mv hardware-configuration.nix hosts/myhost/</code></pre>
+        <p>Edit <code>hosts/myhost/configuration.nix</code> to import it (already done above).</p>
+    </section>
+
+    <section id="install-nixos-with-the-flake">
+        <h2>Install NixOS with the Flake</h2>
+        <pre><code>nixos-install --flake /mnt/etc/nixos#myhost</code></pre>
+        <ul>
+            <li>It will ask for root password — set a strong one.</li>
+            <li>When finished: <code>reboot</code></li>
+            <li>Remove USB and boot into your new system! 🎉</li>
+        </ul>
+    </section>
+
+    <section id="first-boot--final-steps">
+        <h2>First Boot & Final Steps</h2>
+        <ol>
+            <li>Log in as your user (password = initialPassword you set).</li>
+            <li><strong>Immediately change passwords</strong>:<br>
+                <pre><code>passwd          # root
+passwd          # your user</code></pre>
+            </li>
+            <li>(Optional) Commit your config to Git:<br>
+                <pre><code>cd /etc/nixos
+git add .
+git commit -m "Initial install"
+# Push to GitHub for backup/reproducibility</code></pre>
+            </li>
+        </ol>
+    </section>
+
+    <section id="applying-changes-later">
+        <h2>Applying Changes Later</h2>
+        <p>Edit files in <code>/etc/nixos</code>, then:</p>
+        <pre><code>sudo nixos-rebuild switch --flake /etc/nixos#myhost</code></pre>
+        <p>Home Manager changes are applied automatically! No separate command needed. ✨</p>
+        <p>To update everything:</p>
+        <pre><code>cd /etc/nixos
+nix flake update
+sudo nixos-rebuild switch --flake .#myhost</code></pre>
+    </section>
+
+    <section id="tips--troubleshooting">
+        <h2>Tips & Troubleshooting</h2>
+        <ul>
+            <li><strong>Garbage collect old generations</strong>: <code>sudo nix-collect-garbage -d</code></li>
+            <li><strong>Rollback</strong>: <code>sudo nixos-rebuild switch --rollback</code></li>
+            <li><strong>Wifi issues?</strong> Enable NetworkManager: add <code>networking.networkmanager.enable = true;</code> and group "networkmanager"</li>
+            <li><strong>Want more packages?</strong> Just add them to <code>environment.systemPackages</code> or <code>home.packages</code></li>
+            <li><strong>Stuck?</strong> The NixOS Discord, Reddit r/NixOS, or Discourse are super friendly.</li>
+            <li><strong>Advanced</strong>: Modularize further (split files, add more hosts, secrets with sops-nix, etc.)</li>
+        </ul>
+    </section>
+
+    <footer>
+        <p>You're done! Enjoy your beautiful, reproducible NixOS system. 🐧❤️</p>
+        <p>Feel free to fork this setup, customize, and make it yours. Happy Nixing!</p>
+        <p>Generated on January 19, 2026, for friends in Tashkent! 🌍</p>
+    </footer>
+</body>
+</html>
