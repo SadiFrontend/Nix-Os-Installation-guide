@@ -268,5 +268,4 @@ sudo nixos-rebuild switch --flake .#myhost
 You're done! Enjoy your beautiful, reproducible NixOS system. 🐧❤️
 
 Feel free to fork this setup, customize, and make it yours. Happy Nixing!
-```
-```
+
